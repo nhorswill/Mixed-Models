@@ -1,0 +1,155 @@
+---
+title: "HW9"
+author: "Nathan Horswill"
+date: "April 11, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Ch 10, q3 a
+
+```{r 3a}
+data(eggprod,package="faraway")
+plot(eggs~treat,data=eggprod)
+plot(eggs~block,data=eggprod)
+```
+
+While it is unclear if there is a difference in means for treatments E anf F, clearly treatment O differs significantly.  Based on this I would anticipate the lowest egg production from block 2, treatment O, and the highest from block 1, treatment E or F.
+
+## 3 b
+
+```{r 3b}
+lmod<-lm(eggs~treat+block,data=eggprod)
+summary(lmod)
+par(mfrow=c(2,2))
+plot(lmod)
+```
+
+As we saw in the plots in part a, there is a more significant effect due to treatment than to block.  There are no indications of an ill fitting model from the diagnostics plots.
+
+## 3 c
+
+```{r 3c}
+library(lme4)
+library(faraway)
+lrmod<-lmer(eggs~treat+(1|block),data=eggprod,REML=F)
+summary(lrmod)
+sumary(lrmod)
+```
+
+According to the model treatment E results in the highest production of eggs.  The standard error of treatment F is larger than the effect (as measured by it's coefficient), so treatment F is not statistically significantly different from treatment E.
+
+## 3 d
+
+```{r 3d}
+library(pbkrtest)
+ntmod<-lmer(eggs~1+(1|block),data=eggprod,REML=F)
+KRmodcomp(lrmod,ntmod)
+```
+
+There is clear indication of a significant difference in the treatments.
+
+## 3 e 
+
+```{r 3e, message=FALSE, warning=FALSE}
+lrstat<-numeric(1000)
+for (i in 1:1000){
+  reggs<-unlist(simulate(ntmod))
+  amod<-refit(lrmod,reggs)
+  nmod<-refit(ntmod,reggs)
+  lrstat[i]<-2*(logLik(amod,REML=F)-logLik(nmod,REML=F))
+}
+mean(lrstat>2*(logLik(lrmod,REML=F)-logLik(ntmod,REML=F)))
+```
+
+Though the p-value acquired through bootstrapping is slightly higher than in part f, it is not significantly different.  It does increase to over .05, so it appears to not achieve statistical significance.  However, it is sufficiently close to the result form part (d) that is highlights how arbitrary the cuttoff of .05 is.
+
+## 3 f
+
+```{r 3f,message=FALSE, warning=FALSE}
+lrstat<-numeric(1000)
+nkmod<-lm(eggs~1,data=eggprod)
+ltmod<-lmer(eggs~1+(1|block),data=eggprod,REML=F)
+stat<-2*(logLik(ltmod)-logLik(nkmod))
+pv<-pchisq(stat,1,lower.tail = F)
+for (i in 1:1000){
+  seggs<-unlist(simulate(ntmod))
+  amod<-lmer(seggs~1+(1|block),data=eggprod,REML=F)
+  nmod<-lm(seggs~1,data=eggprod)
+  lrstat[i]<-2*(logLik(amod,REML=F)-logLik(nmod,REML=F))
+}
+mean(lrstat>stat)
+```
+
+We reject the hypothesis that there is a statistically significant effect due to block.  The concurs with our model in part (b).
+
+## Ch 10, q5 a
+
+```{r 5a}
+library(ggplot2)
+data("broccoli")
+ggplot(data=broccoli,aes(x=cluster,y=wt,col=box))+geom_point()
+ggplot(data=broccoli,aes(x=box,y=wt,col=grower))+geom_point()
+
+```
+
+Through the above 3 graphs it is very difficult to see if there is a statistically significant difference between clusters, bozes or growers.  We anticipate very minimal effect when we control for these three variables in a model.
+
+## 5 b
+
+```{r 5b, warning=FALSE, message=FALSE}
+library(tidyverse)
+broccoli%>%group_by(grower)%>%summarise(average = mean(wt),stddev=sd(wt))
+broccoli%>%group_by(box)%>%summarise(average = mean(wt),stddev=sd(wt))
+```
+
+We can see the standard deviations of each grouping is far larger than the group differences.  This confirms our intuition that there is not a statistically significant differences between group means.
+
+## 5 c
+
+```{r 5c}
+remod<-lmer(wt~cluster+grower+(1|box),data=broccoli,REML=F)
+summary(remod)
+```
+
+None of the t values above show significance of the fixed effects.
+
+## 5 d
+
+```{r 5d}
+grmod<-lmer(wt~(1|box)+cluster,data=broccoli,REML=F)
+KRmodcomp(grmod,remod)
+```
+
+There is very little evidence of a statistically significant effect due to grower.
+
+## 5 e
+
+```{r 5e, message=FALSE, warning=FALSE}
+amod<-lmer(wt~(1|box)+cluster+grower,data=broccoli,REML=F)
+bmod<-lm(wt~grower+cluster,data=broccoli)
+lrstat<-numeric(1000)
+stat<-2*(logLik(amod)-logLik(bmod))
+pv<-pchisq(stat,1,lower.tail = F)
+c(stat,pv)
+for (i in 1:1000){
+  swt<-unlist(simulate(bmod))
+  amod<-lmer(swt~(1|box)+cluster+grower,data=broccoli,REML=F)
+  nmod<-lm(swt~grower+cluster,data=broccoli)
+  lrstat[i]<-2*(logLik(amod,REML=F)-logLik(nmod,REML=F))
+}
+
+mean(lrstat>stat)
+```
+
+We fail to see evidence that the boxed effect is significant.  
+
+## 5 f
+
+```{r 5f, message=FALSE, warning=FALSE}
+confint(remod,method="boot")
+```
+
